@@ -42,6 +42,88 @@ class ConvexHullSolverThread(QThread):
 	debug = True
 	verbose = False
 
+	def find_upper(self, found, counter, pivot, list_of_points, looping_direction, slope_direction) :
+
+		initial_index = 0
+		initial_slope = 0
+		point_to_compare_to = 0
+
+		print('LOOKING AT DIRECTION: ', looping_direction)
+
+
+
+		if looping_direction == 'left' :
+			initial_slope = 1000
+			initial_index = list_of_points.index(list_of_points[len(sorted(list_of_points, key=self.point_sorting))-1])
+			# sorted_left_polygon = sorted(left_pol, key=self.point_sorting)
+			# most_left_point = sorted_left_polygon[len(sorted_left_polygon)-1]
+			# starting_left_point = left_pol.index(most_left_point)
+		else :
+			initial_index += counter
+
+		while not found:
+			# right_point = right_pol[right_index % len(right_pol)]
+			point_to_compare_to = list_of_points[initial_index % len(list_of_points)]
+			print('looking at to compare: ', point_to_compare_to)
+
+			slope = self.calculate_slope(pivot, point_to_compare_to)
+
+			print('pivot ', pivot)
+			print('to compare to ', point_to_compare_to)
+
+			attempted_line = [QLineF(pivot,point_to_compare_to)]
+			self.view.addLines(attempted_line,(51,76,255))
+
+			print('temp upper slope: ', slope)
+			print('upper slope', initial_slope)
+
+			print('increase: ', slope_direction == 'increase')
+			print()
+			print('decresed: ', slope_direction == 'decreased')
+			print(slope_direction)
+			print()
+			print()
+
+			if (slope > initial_slope and slope_direction == 'increase') or (slope < initial_slope and slope_direction == 'decreased') :
+				initial_slope = slope
+				print('found final slope: ', initial_slope)
+				#check for the next one, if next one is bigger then keep going otherwise quit
+				print()
+				print('current index: ', initial_index)
+				print('in: ', list_of_points)
+				print()
+				if looping_direction == 'left' :
+					next_index = initial_index-1
+				else :
+					next_index = initial_index+1
+
+				print('different index: ', next_index)
+				print()
+				print()
+				print('can you do that: ', list_of_points[next_index % len(list_of_points)])
+				slope = self.calculate_slope(pivot, list_of_points[next_index % len(list_of_points)])
+				print('second slope: ', slope)
+
+				if (slope > initial_slope and slope_direction == 'increase') or (slope < initial_slope and slope_direction == 'decreased') :
+					if (looping_direction == 'right') :
+						initial_index +=1
+					else :
+						initial_index -=1
+				else :
+					found = True
+					attempted_line = [QLineF(pivot,point_to_compare_to)]
+					self.view.addLines(attempted_line,(0,0,0))
+				#draw the line with different Color
+			# else :
+				#draw the same line than before with a different color??? DO I NEED TO DELETE THE OTHER ONE FIZRT??
+
+			if (looping_direction == 'right') :
+				initial_index +=1
+			else :
+				initial_index -=1
+
+		return (found, point_to_compare_to)
+
 	def merge(self, left_pol, right_pol):
 
 		# farthest_left = right_pol[len(right_pol)-1]
@@ -49,7 +131,7 @@ class ConvexHullSolverThread(QThread):
 		#
 		# farthest_right = left_pol[len(left_pol)-1]
 		# print('farther right: ', farthest_right)
-		print()
+		print('==TOP===')
 		print('left_pol: ', left_pol)
 		print()
 		print()
@@ -59,26 +141,217 @@ class ConvexHullSolverThread(QThread):
 		# stop = 0
 		#
 		good_one = 0
+		upper_slope = 0
+		temp_upper_slope = 0
 		stop = 0
 		stop2 = 0
-		left_index = len(left_pol)-1
+		#to get this left index you have to sort the array and get the
+		sorted_left_polygon = sorted(left_pol, key=self.point_sorting)
+		most_left_point = sorted_left_polygon[len(sorted_left_polygon)-1]
+		starting_left_point = left_pol.index(most_left_point)
+
+		if self.debug and self.verbose :
+			print('SORTED POINTS FOR LEFTED POINT: ', sorted_left_polygon)
+			print('POINT___: ', most_left_point)
+			print('Index of left most point: ', starting_left_point)
+			print()
+			print()
+
+		# left_index = len(left_pol)-1
+		left_index = starting_left_point
 		right_index = 0
 
-		farthest_right = left_pol[left_index]
+		# farthest_right = left_pol[left_index]
+		farthest_right = left_pol[starting_left_point]#THIS IS A DUPLICATED starting_left_point
 		farthest_left = right_pol[right_index]
+
+		found_upper = False
+		found_lower = False
+
+		final_pivot_left = 0
+		final_pivot_right = 0
+		balance = 0
+
 		print()
+		print('0000000000 MERGING 00000000000000000000000000000')
+
+
 		print('farthes right: ', farthest_right)
 		print('farthes left: ', farthest_left)
 		print()
-		while stop != 5:
+		while stop != 1:
+		# while not found_upper:
 			stop+=1
-			print('looking at: ', left_pol[left_index % len(left_pol)])
+
+			left_point = left_pol[left_index % len(left_pol)]
+			print('looking at: ', left_point)
 			left_index -=1
 
-			while stop2 != 5:
-				stop2+=1
-				print('looking at right: ', right_pol[right_index % len(right_pol)])
-				right_index +=1
+			left_upper_tangent = False
+			right_upper_tangent = False
+			counter = 0
+
+			while balance != 2 :
+
+				(left_upper_tangent, pivot_left) = self.find_upper(False, counter, left_point, right_pol, 'right', 'increase') #save pivots and compare when they came back if they are the same we are done
+				(right_upper_tangent, pivot_right) = self.find_upper(False, counter, pivot_left, left_pol, 'left', 'decreased')
+				print('whats looking at now: ', pivot_right)
+				if (final_pivot_left == pivot_left) and (final_pivot_right == pivot_right) :
+					balance +=1
+					print('was balance so far: ', balance)
+
+				final_pivot_left = pivot_left
+				final_pivot_right = pivot_right
+				left_point = pivot_right
+				counter += 1
+				print('now counter: ', counter)
+
+			# # while stop2 != 3:
+			# while not found_upper:
+			# 	stop2+=1
+			# 	right_point = right_pol[right_index % len(right_pol)]
+			# 	print('looking at right: ', right_point)
+			#
+			# 	temp_upper_slope = self.calculate_slope(left_point, right_point)
+			#
+			# 	print('create line with left point: ', left_point)
+			# 	print('create line with right point: ', right_point)
+			# 	attempted_line = [QLineF(left_point,right_point)]
+			# 	self.view.addLines(attempted_line,(51,76,255))
+			#
+			# 	print('temp upper slope: ', temp_upper_slope)
+			# 	print('upper slope', upper_slope)
+			#
+			# 	if temp_upper_slope > upper_slope :
+			# 		upper_slope = temp_upper_slope
+			# 		print('found final slope: ', upper_slope)
+			# 		#check for the next one, if next one is bigger then keep going otherwise quit
+			# 		print()
+			# 		print('current index: ', right_index)
+			# 		print('in: ', right_pol)
+			# 		print()
+			# 		different_index = right_index+1
+			# 		print('different index: ', different_index)
+			# 		print()
+			# 		print()
+			# 		print('can you do that: ', right_pol[different_index % len(right_pol)])
+			# 		second_temp_upper_slope = self.calculate_slope(left_point, right_pol[different_index % len(right_pol)])
+			# 		print('second slope: ', second_temp_upper_slope)
+			#
+			# 		if second_temp_upper_slope > upper_slope :
+			# 			right_index +=1
+			# 		else :
+			# 			found_upper = True
+			# 			found_lower = True
+			# 			attempted_line = [QLineF(left_point,right_point)]
+			# 			self.view.addLines(attempted_line,(0,0,0))
+			# 		#draw the line with different Color
+			# 	# else :
+			# 		#draw the same line than before with a different color??? DO I NEED TO DELETE THE OTHER ONE FIZRT??
+			#
+			# 	right_index +=1
+
+
+	# def merge(self, left_pol, right_pol):
+	#
+	# 	# farthest_left = right_pol[len(right_pol)-1]
+	# 	# print('farther left: ', farthest_left)
+	# 	#
+	# 	# farthest_right = left_pol[len(left_pol)-1]
+	# 	# print('farther right: ', farthest_right)
+	# 	print('==TOP===')
+	# 	print('left_pol: ', left_pol)
+	# 	print()
+	# 	print()
+	# 	print('right_pol: ', right_pol)
+	# 	print()
+	#
+	# 	# stop = 0
+	# 	#
+	# 	good_one = 0
+	# 	upper_slope = 0
+	# 	temp_upper_slope = 0
+	# 	stop = 0
+	# 	stop2 = 0
+	# 	#to get this left index you have to sort the array and get the
+	# 	sorted_left_polygon = sorted(left_pol, key=self.point_sorting)
+	# 	most_left_point = sorted_left_polygon[len(sorted_left_polygon)-1]
+	# 	starting_left_point = left_pol.index(most_left_point)
+	#
+	# 	if self.debug and self.verbose :
+	# 		print('SORTED POINTS FOR LEFTED POINT: ', sorted_left_polygon)
+	# 		print('POINT___: ', most_left_point)
+	# 		print('Index of left most point: ', starting_left_point)
+	# 		print()
+	# 		print()
+	#
+	# 	# left_index = len(left_pol)-1
+	# 	left_index = starting_left_point
+	# 	right_index = 0
+	#
+	# 	# farthest_right = left_pol[left_index]
+	# 	farthest_right = left_pol[starting_left_point]#THIS IS A DUPLICATED starting_left_point
+	# 	farthest_left = right_pol[right_index]
+	#
+	# 	found_upper = False
+	# 	found_lower = False
+	#
+	# 	print()
+	# 	print('farthes right: ', farthest_right)
+	# 	print('farthes left: ', farthest_left)
+	# 	print()
+	# 	# while stop != 5:
+	# 	while not found_upper:
+	# 		# stop+=1
+	#
+	# 		left_point = left_pol[left_index % len(left_pol)]
+	# 		print('looking at: ', left_point)
+	# 		left_index -=1
+	#
+	# 		# while stop2 != 3:
+	# 		while not found_upper:
+	# 			stop2+=1
+	# 			right_point = right_pol[right_index % len(right_pol)]
+	# 			print('looking at right: ', right_point)
+	#
+	# 			temp_upper_slope = self.calculate_slope(left_point, right_point)
+	#
+	# 			print('create line with left point: ', left_point)
+	# 			print('create line with right point: ', right_point)
+	# 			attempted_line = [QLineF(left_point,right_point)]
+	# 			self.view.addLines(attempted_line,(51,76,255))
+	#
+	# 			print('temp upper slope: ', temp_upper_slope)
+	# 			print('upper slope', upper_slope)
+	#
+	# 			if temp_upper_slope > upper_slope :
+	# 				upper_slope = temp_upper_slope
+	# 				print('found final slope: ', upper_slope)
+	# 				#check for the next one, if next one is bigger then keep going otherwise quit
+	# 				print()
+	# 				print('current index: ', right_index)
+	# 				print('in: ', right_pol)
+	# 				print()
+	# 				different_index = right_index+1
+	# 				print('different index: ', different_index)
+	# 				print()
+	# 				print()
+	# 				print('can you do that: ', right_pol[different_index % len(right_pol)])
+	# 				second_temp_upper_slope = self.calculate_slope(left_point, right_pol[different_index % len(right_pol)])
+	# 				print('second slope: ', second_temp_upper_slope)
+	#
+	# 				if second_temp_upper_slope > upper_slope :
+	# 					right_index +=1
+	# 				else :
+	# 					found_upper = True
+	# 					found_lower = True
+	# 					attempted_line = [QLineF(left_point,right_point)]
+	# 					self.view.addLines(attempted_line,(0,0,0))
+	# 				#draw the line with different Color
+	# 			# else :
+	# 				#draw the same line than before with a different color??? DO I NEED TO DELETE THE OTHER ONE FIZRT??
+	#
+	# 			right_index +=1
 
 
 
@@ -86,6 +359,20 @@ class ConvexHullSolverThread(QThread):
 		#While the edge is not upper tangent to the left, move counter-clockwise to the next point on the left hull
 		#Hint: We want to move to the next point(s) on the left hull as long as the slope decreases
 		#While the edge is not upper tangent to the right, move clockwise to the next point on the right hull
+	def calculate_slope(self, left_point, right_point) :
+
+		print()
+		print('calculating slope::: ')
+		print('left point: ', left_point)
+		print('right point: ', right_point)
+		print()
+		x = left_point.x() - right_point.x()
+		y = left_point.y() - right_point.y()
+
+		if x == 0 or y == 0 :
+			return 0
+		else:
+			return y/x
 
 
 	def sort_based_on_slope(self, list_point):
@@ -107,6 +394,13 @@ class ConvexHullSolverThread(QThread):
 				x = list_point[0].x() - list_point[i].x()
 				y = list_point[0].y() - list_point[i].y()
 
+				print('first point: ', list_point[0])
+				print('VS: ')
+				print('next one" ', list_point[i])
+				print()
+				print('x: ', x)
+				print('y: ', y)
+
 				if x == 0 and y == 0 : continue
 				if x == 0 :
 					slope = 0
@@ -115,7 +409,9 @@ class ConvexHullSolverThread(QThread):
 
 				if self.debug and self.verbose : print('slope value: ', slope)
 				if slope > largest_slope:
-					larger_slope = slope
+					print('largest slope was: ', largest_slope)
+					largest_slope = slope
+
 
 					if i > 1:
 						larger_slope = list_point[i]
@@ -151,31 +447,15 @@ class ConvexHullSolverThread(QThread):
 
 		length = len(sorted_list)
 		if length <= 3 :
+			print()
+			print("chunk received: ", sorted_list)
 			sorted_list = self.sort_based_on_slope(sorted_list)
+			print("chunk leaving: ", sorted_list)
+			print()
+			print()
 			if self.debug : self.draw_lines(sorted_list)
 			return sorted_list
 
-
-
-
-
-			# polygon = [QLineF(sorted_list[i],sorted_list[(i+1)%9]) for i in range(9)]
-			# assert( type(polygon) == list and type(polygon[0]) == QLineF )
-
-
-			# self.view.clearPoints()
-			# self.view.clearLines()
-			# self.view.addPoints( self.points, (0,0,0) )
-			#
-			# for i in range(10):
-			# 	print('justlik them')
-			# 	myline = [QLineF(sorted_list[i],sorted_list[(i+1)%10])]
-			# 	self.view.addLines(myline,(255,0,0))
-
-
-
-			# self.show_hull.emit(polygon,(255,0,0))
-			# return sorted_list
 
 		middle_index = math.ceil(length/2)
 		# print('middle index:: ', middle_index)
@@ -197,30 +477,6 @@ class ConvexHullSolverThread(QThread):
 		return merge
 
 
-
-		# print()
-		# print()
-		# print('FIRST HALF BR:', first_half)
-		# print()
-		# print()
-		# print('second HALF BR', second_half)
-		#
-		# merged_array = first_half + second_half
-		#
-		# print('merged Array: ', merged_array)
-
-		# # polygon = [QLineF(first_half[0], second_half[0])]
-		# # print('polygon: ', polygon)
-		# print()
-		# print()
-		# print('How many yimes does this happen:')
-		# # print('second_half', second_half)
-		# # assert( type(polygon) == list and type(polygon[0]) == QLineF )
-		# # self.show_hull.emit(polygon,(255,0,0))
-		#
-		#
-		# #return merge(left, right)
-
 	def run( self):
 
 		assert( type(self.points) == list and type(self.points[0]) == QPointF )
@@ -236,10 +492,16 @@ class ConvexHullSolverThread(QThread):
 		'''
 
 		#case: 10 points user friendly
-		self.points = [QPointF(0.4, 0.1),QPointF(0.8, 0.10),QPointF(0.5, 0.9),QPointF(0.3, 0.2),QPointF(0.7, 0.4),QPointF(0.2, 0.8),QPointF(0, 0.9),QPointF(0.6, 0.8),QPointF(0.1, 0.5),QPointF(0.9, 0.9)]
+		# self.points = [QPointF(0.4, 0.1),QPointF(0.8, 0.10),QPointF(0.5, 0.9),QPointF(0.3, 0.2),QPointF(0.7, 0.4),QPointF(0.2, 0.8),QPointF(0, 0.9),QPointF(0.6, 0.8),QPointF(0.1, 0.5),QPointF(0.9, 0.9)]
 
 		#case: 4 points
-		#self.points = [QPointF(0.4, 0.1),QPointF(0.8, 0.10),QPointF(0.5, 0.9), QPointF(0.7, 0.63)]
+		# self.points = [QPointF(0.4, 0.1),QPointF(0.8, 0.10),QPointF(0.5, 0.9), QPointF(0.7, 0.63)]
+
+		#case: 6 poinys
+		# self.points = [QPointF(0.4, 0.1),QPointF(0.8, 0.10),QPointF(0.5, 0.9),QPointF(0.3, 0.2),QPointF(0.7, 0.4),QPointF(0.2, 0.8)]
+		# self.points = [QPointF(0.4, 0.1),QPointF(0.8, 0.10),QPointF(0.5, 0.9),QPointF(0.3, 0.2),QPointF(0.7, 0.4),QPointF(0.2, 0.8),QPointF(0.6, 0.96)]
+		self.points = [QPointF(0.4, 0.1),QPointF(0.8, 0.10),QPointF(0.5, 0.8),QPointF(0.3, 0.2),QPointF(0.2, 0.8),QPointF(0.6, 0.96)]
+		# self.points = [QPointF(0.4, 0.1),QPointF(0.8, 0.10),QPointF(0.5, 0.9),QPointF(0.3, 0.2),QPointF(0.7, 0.4),QPointF(0.2, 0.8),QPointF(0, 0.9)]
 
 		#case: Base case with no sorting needed
 		# self.points = [QPointF(0.4, 0.1),QPointF(0.8, 0.10),QPointF(0.5, 0.9)]
@@ -273,21 +535,6 @@ class ConvexHullSolverThread(QThread):
 
 		self.divide_and_conquer(sorted_points)
 		t4 = time.time()
-
-		# USE_DUMMY = False
-		# if USE_DUMMY:
-		# 	# this is a dummy polygon of the first 3 unsorted points
-		# 	polygon = [QLineF(self.points[i],self.points[(i+1)%3]) for i in range(3)]
-		#
-		# 	# when passing lines to the display, pass a list of QLineF objects.  Each QLineF
-		# 	# object can be created with two QPointF objects corresponding to the endpoints
-		# 	assert( type(polygon) == list and type(polygon[0]) == QLineF )
-		# 	# send a signal to the GUI thread with the hull and its color
-		# 	self.show_hull.emit(polygon,(255,0,0))
-		#
-		# else:
-		# 	# TODO: PASS THE CONVEX HULL LINES BACK TO THE GUI FOR DISPLAY
-		# 	pass
 
 		# send a signal to the GUI thread with the time used to compute the hull
 		self.display_text.emit('Time Elapsed (Convex Hull): {:3.3f} sec'.format(t4-t3))
